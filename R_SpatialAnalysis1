@@ -1,0 +1,65 @@
+#This script demonstrates essential techniques in spatial data processing in R, 
+#such as reading and writing shapefiles, subsetting spatial data, projecting data 
+#to match coordinate reference systems, calculating area, and selecting features based 
+#on spatial location. The use of plot, tmap, and 
+#mapview functions showcases different approaches to visualizing spatial data.
+
+
+
+# Loading the necessary libraries
+library(sf)
+library(tmap)
+library(mapview)
+
+# Reading a shapefile
+pop10 <- st_read('y2010.shp')
+# Displaying the first few rows of the dataset
+head(pop10)
+
+# Plotting a column from the shapefile
+plot(pop10["HOUSING10"], axes = T, key.pos = 4)
+
+# Subsetting the data based on a condition
+# Keeping only areas with population greater than 200
+popsub <- pop10[pop10$POP10 > 200,]
+# Plotting the subset data
+plot(popsub["POP10"], axes = T, key.pos = 4)
+
+# Using tmap for more advanced plotting
+tmap_mode("plot")
+tm_shape(popsub) +
+  tm_polygons("HOUSING10") +
+  tm_layout(legend.text.size = 1, legend.title.size = 1.5)
+
+# Writing the subset data to a new shapefile
+st_write(popsub, "popsub.shp", delete_layer = T)
+
+# Working with projections
+# Getting the current projection of popsub
+proj4string(popsub)
+# Loading and checking the projection of a raster file
+nlcd <- raster('nlcd.tif')
+proj4string(nlcd)
+
+# Plotting the raster and adding the shapefile on top
+plot(nlcd)
+plot(popsub, add = T)
+
+# Transforming the projection of popsub to match the raster's projection
+popsub_p <- st_transform(popsub, st_crs(nlcd))
+# Plotting the transformed shapefile on top of the raster
+plot(nlcd)
+plot(st_geometry(popsub_p), add = T)
+
+# Projecting another raster to match the nlcd's projection
+r <- raster('tm1.tif')
+pr <- projectRaster(r, res = 30, crs = crs(nlcd))
+
+# Calculating area for each feature in the projected shapefile
+pophu_p$area <- st_area(pophu_p)
+
+# Selecting features by location
+# Reading another shapefile for county
+county <- st_read('mycounty.shp')
+# Selecting features from pophu_p that fall within the county
+pophu_withincounty <- st_intersection(pophu_p, county)

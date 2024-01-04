@@ -1,0 +1,76 @@
+#This script encompasses a variety of tasks including data smoothing 
+#techniques, nonparametric regression, spatial data processing, and 
+#applying functions to multiple data files. It demonstrates practical 
+#applications in environmental data analysis, such as smoothing 
+#evapotranspiration data, calculating forest percentages 
+#from raster data, and creating spatial points from coordinates.
+
+
+
+# Loading necessary libraries for spatial data and plotting
+library(sf)
+library(raster)
+library(tmap)
+library(tidyverse)
+
+# Reading evapotranspiration (ET) data from a CSV file
+et <- read.csv('et.csv')
+# Plotting ET against days
+plot(et$day, et$et)
+
+# Bin smoothing using ksmooth with a box kernel
+# This technique smooths the data by averaging within a window (bin)
+fit <- with(et, ksmooth(day, et, kernel = "box", bandwidth = 20))
+plot(et$day, et$et)
+lines(fit$x, fit$y)
+
+# Testing different bandwidths with a normal kernel for smoothing
+fit <- with(et, ksmooth(day, et, kernel = "normal", bandwidth = 20))
+plot(et$day, et$et)
+lines(fit$x, fit$y)
+
+# Nonparametric Regression via Smoothing Splines
+# This approach fits a smoothing spline to the data
+library(npreg)
+et <- read.csv('et.csv')
+plot(et$day, et$et)
+
+mod.ss <- ss(et$day, et$et) # Fitting a smoothing spline
+et_fit <- predict.ss(mod.ss, 1:365) # Predicting ET for each day
+plot(et$day, et$et)
+lines(et_fit$x, et_fit$y)
+
+# Using raster and rgdal for spatial data processing
+library(raster)
+library(rgdal)
+library(dplyr)
+
+# Assuming 'myfunction.R' contains relevant functions
+source('./myfunction.R')
+
+# Function calls to process specific raster data
+p_forest('usgs_02022500.tif')
+p_forest('usgs_02053800.tif')
+
+# Function to create a spatial point feature using longitude and latitude
+create_point <- function(lon, lat) {
+  point <- st_point(c(lon, lat)) # Create a point feature
+  point_sf <- st_sf(geometry = st_sfc(point)) # Convert to a simple feature object
+  point_sf <- st_set_crs(point_sf, 4326) # Set the CRS to WGS84
+  return(point_sf)
+}
+
+a <- create_point(-78, 38) # Example usage of the create_point function
+
+# Function to calculate forest percentage in a given raster file
+p_forest <- function(usgs_id){
+  a <- raster(usgs_id)
+  lc_freq <- data.frame(freq(a, useNA = 'no'))
+  u <- lc_freq[lc_freq$value >= 41 & lc_freq$value <= 43,]
+  forest_per <- sum(u$count) / sum(lc_freq$count)
+  return(forest_per)
+}
+
+# Applying the forest percentage calculation to multiple raster files
+nlcd_list <- Sys.glob('*.tif')
+u <- lapply(nlcd_list, p_forest) # Using lapply to apply function to each file

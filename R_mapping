@@ -1,0 +1,171 @@
+#This script covers a range of techniques for 
+#visualizing spatial data in R. It demonstrates basic and 
+#dvanced mapping with tmap and ggplot2, handling raster data, 
+#customizing maps with additional elements like scale bars and 
+#north arrows, and classifying data using methods like Jenks 
+#natural breaks. It also shows the flexibility of ggplot2 for creating 
+#both standard plots and spatial visualizations.
+
+
+
+# Loading necessary libraries for spatial data and visualization
+library(sf)
+library(tidyverse)
+library(raster)
+library(tmap)
+library(classInt)
+
+# Reading a shapefile and omitting rows with NA values
+wui <- st_read('wui.shp')
+wui_new <- na.omit(wui)
+
+# Quick mapping with tmap's qtm function
+qtm(wui_new)
+
+# Regular mapping
+# Showing only the boundaries of the polygons
+tm_shape(wui_new) +
+  tm_borders()
+
+# Filling polygons with a fixed color
+tm_shape(wui_new) +
+  tm_borders() +
+  tm_fill(col = "lightblue")
+
+# tm_polygons() is a combination of tm_borders() and tm_fill()
+# Coloring map by one of the attributes
+tm_shape(wui_new) +
+  tm_polygons('vegmean', palette = c("yellow", "darkgreen")) +
+  tm_layout(title = 'WUI map', legend.text.size = 1)
+
+# Selecting a different color scheme
+tm_shape(wui_new) +
+  tm_polygons('vegmean', palette = "PuBu") +
+  tm_layout(title = 'WUI map', legend.text.size = 1)
+
+# Adding scale bar and north arrow to the map
+tm_shape(wui_new) +
+  tm_polygons('vegmean', palette = c("yellow", "darkgreen")) +
+  tm_layout(title = 'WUI map',
+            title.position = c("center", "top"),
+            legend.text.size = 1,
+            legend.position = c("right", "bottom")) +
+  tm_scale_bar(breaks = c(0, 2, 4), text.size = 2, position = c("left", "bottom")) +
+  tm_compass(type = "4star", size = 6, position = c("right", "top"))
+
+# Mapping values into user-defined groups using Jenks natural breaks
+num_class <- classIntervals(wui_new$POP10, n = 7, style = "jenks")
+wui_new$POPclasses <- cut(wui_new$POP10, unique(num_class$brks), include.lowest = T)
+
+tm_shape(wui_new) +
+  tm_polygons("POPclasses", palette = c("yellow", "darkgreen")) +
+  tm_layout(legend.text.size = 1.2)
+
+# Maps for raster data
+dem <- raster('dem.tif')
+names(dem) <- 'elev'
+
+tm_shape(dem) +
+  tm_raster(style = "cont", palette = "-RdYlGn")
+
+# Categorical raster data
+nlcd <- raster('nlcd.tif')
+# Reclassifying nlcd into 6 land cover groups
+nlcd[nlcd >= 81] <- 81
+nlcd[nlcd >= 21 & nlcd <= 24] <- 21
+nlcd[nlcd >= 31 & nlcd <= 71] <- 41
+pal4 <- c("blue", "red", "green", "grey")
+tm_shape(nlcd) + 
+  tm_raster(style = "cat", palette = pal4, labels = c('water', 'urban', 'forest', 'ag')) +
+  tm_layout(legend.text.size = 1.5,
+            legend.position = c("right", "bottom"))
+
+# Grouping map layers for a comprehensive map
+basin <- st_read('basin.shp')
+qtm(basin)
+stream <- st_read('streams.shp')
+usgs_site <- st_read('usgs_gage.shp')
+
+# Importing and naming elevation data
+dem <- raster('dem.tif')
+names(dem) <- 'Elevation'
+
+# Creating a composite map with different layers
+tm_shape(dem) +
+  tm_raster(style = "cont", palette = "-RdYlGn") +
+  tm_layout(legend.title.size = 1, legend.position = c("right", "top"), legend.text.size = 1.5) +
+  tm_shape(stream) + 
+  tm_lines(col = 'blue') +
+  tm_shape(usgs_site) +
+  tm_symbols(shape = 24, col = 'red') +
+  tm_scale_bar(breaks = c(0, 2, 4), text.size = 2, position = c("left", "bottom")) +
+  tm_compass(type = "4star", size = 6, position = c("left", "top"))
+
+# Demonstrations using ggplot2 for plotting
+# Simple scatter plot with ggplot2
+ggplot(data = mpg) +
+  geom_point(mapping = aes(x = displ, y = hwy))
+
+# Control color in a scatter plot
+ggplot(data = mpg) +
+  geom_point(mapping = aes(x = displ, y = hwy), color = 'blue')
+
+# Different color and shape based on selected attribute
+ggplot(data = mpg) +
+  geom_point(mapping = aes(x = displ, y = hwy, color = class)) +
+  geom_point(mapping = aes(x = displ, y = hwy, shape = class))
+
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point(size = 3, color = 'red')
+
+# Adding a smooth line to a scatter plot
+ggplot(data = mpg) +
+  geom_point(mapping = aes(x = displ, y = hwy, color = class)) +
+  geom_smooth(mapping = aes(x = displ, y = hwy))
+
+# Control size, color, and add labels
+ggplot(data = mpg, aes(x = displ, y = hwy)) +
+  geom_point(size = 5, color = 'red') +
+  geom_smooth() +
+  labs(x = 'Engine Size', y = 'Fuel efficiency', title = 'MPG Plot') +
+  theme_bw(base_size = 20)
+
+# Bar plot using ggplot2
+ggplot(data = mpg) + 
+  geom_bar(mapping = aes(x = class))
+
+# Using ggplot2 for mapping spatial data
+roads <- st_read('road100k_l_va121.shp')
+
+# Plotting roads using ggplot2 with default color scheme
+ggplot(roads) +
+  geom_sf(aes(color = RTTYP))
+
+# Using a user-defined color scheme for roads
+road_palette <- c("U" = "green", "M" = "grey40", "S" = "purple", "I" = "black")
+
+ggplot(roads) +
+  geom_sf(aes(color = RTTYP)) +
+  scale_colour_manual(values = road_palette)
+
+# Adding North Symbols and Scale Bars with ggsn library
+library(ggsn)
+ggplot(roads) +
+  geom_sf(aes(color = RTTYP)) +
+  labs(title = 'Roads', x = '', y = '', color = 'Road Type') +
+  north(roads, location = "topright", symbol = 15) +
+  scalebar(roads, dist = 4, dist_unit = "km", transform = FALSE, model = "WGS84") +
+  theme(axis.text = element_blank(), axis.ticks = element_blank())
+
+## Plotting variable using "jenks" breaks
+pophu <- st_read('censusdata.shp')
+# Generating breaks based on Jenks method
+num_class <- classIntervals(pophu$POP10, n = 7, style = "jenks")
+# Assigning polygons to various groups
+pophu$popgroup <- cut(pophu$POP10, unique(num_class$brks), include.lowest = T)
+
+ggplot(data = pophu) +
+  geom_sf(aes(fill = popgroup)) +
+  scale_fill_brewer(palette = "Greens") +
+  north(pophu, location = "topright", symbol = 15) +
+  scalebar(pophu, dist = 4, dist_unit = "km", transform = T, model = "WGS84")

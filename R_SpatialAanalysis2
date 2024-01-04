@@ -1,0 +1,101 @@
+#This script is focused on spatial data analysis in R, 
+#including reading and joining spatial data, plotting using tmap, 
+#selecting by attributes, creating buffers, and performing zonal statistics. 
+#It uses sf, raster, tmap, and 
+#tidyverse packages for handling various GIS-related tasks.
+
+
+# Installing and loading required libraries
+install.packages('tidyverse')
+install.packages('sf')
+install.packages('raster')
+install.packages('tmap')
+
+library(sf)
+library(raster)
+library(tmap)
+library(tidyverse)
+
+# Reading spatial data and a CSV file
+watershed <- st_read('watershed.shp')
+agstats <- read.csv('agstats.csv')
+
+# Joining the agstats table to the watershed shapefile using 'Subbasin' as the index field
+# Left join ensures all records from the watershed shapefile are kept
+w_ag <- left_join(watershed, agstats, by = 'Subbasin')
+
+# Ensuring the Subbasin fields in both tables are the same data type
+watershed$Subbasin <- as.numeric(watershed$Subbasin)
+w_ag <- left_join(watershed, agstats, by = 'Subbasin')
+
+# Plotting agstats using the tmap library
+# Static plot mode for non-interactive maps
+tmap_mode('plot')
+tm_shape(w_ag) +
+  tm_polygons("MEAN") +
+  tm_layout(legend.position = c("left", "top"), legend.text.size = 2, legend.title.size = 2) +
+  tm_scale_bar(breaks = c(0, 5, 10), text.size = 2)
+
+# Interactive mode for dynamic, interactive maps
+tmap_mode('view')
+tm_shape(w_ag) +
+  tm_polygons("MEAN")
+
+# Additional join types: right_join and inner_join, not demonstrated here
+
+# Practice example
+# Joining l2010.shp and m_elev.csv with 'GEOID' as the index
+# The resulting spatial plot
+tm_shape(l2010_elev) +
+  tm_polygons("elev") +
+  tm_layout(legend.position = c("right", "top"), legend.text.size = 2, legend.title.size = 2) +
+  tm_scale_bar(breaks = c(0, 5, 10), text.size = 2)
+
+# Selecting features by attribute
+# Filtering areas with elevation less than 2.5
+l2010_sub <- l2010_elev[l2010_elev$elev < 2.5,]
+
+# Calculating population density
+# First calculate the area
+l2010_elev$area <- st_area(l2010_elev)
+l2010_elev$pop_den <- l2010_elev$value / (as.numeric(l2010_elev$area) / 1000000)
+# Filtering for specific conditions
+l2010_sub <- l2010_elev[l2010_elev$elev < 2.5 & l2010_elev$pop_den > 1000,]
+plot(l2010_sub["pop_den"])
+
+# Creating a buffer
+dem <- raster('dem.tif')
+plot(dem)
+stream <- st_read('stream.shp')
+plot(stream, add = T)
+# Buffering the stream by 300 meters
+stream_b <- st_buffer(stream, dist = 300)
+plot(stream_b, add = T)
+
+# Different buffer sizes based on a column value
+buffersize <- rep(0, dim(stream)[1])
+buffersize[stream$Wid2 > 16] <- 300
+buffersize[stream$Wid2 <= 16] <- 100
+plot(dem)
+# Applying the variable buffer sizes
+stream_b <- st_buffer(stream, dist = buffersize)
+plot(stream_b, add = T)
+
+# Creating a union of all features in the watershed
+studyarea <- st_union(watershed)
+plot(studyarea)
+
+# Demos of zonal statistics
+cbg <- readOGR('.', layer = 'cbg')
+crs(cbg)
+
+dem <- raster('dem_county.tif')
+demp <- projectRaster(dem, res = 30, crs = crs(cbg))
+
+# Rasterizing cbg
+cbg$newid <- 1:length(cbg)
+cbg_raster <- rasterize(cbg, demp, field = cbg$newid)
+# Calculating zonal statistics
+dem_mean <- zonal(demp, cbg_raster, fun = 'mean')
+dem_max <- zonal(demp, cbg_raster, fun = 'max')
+dem_min <- zonal(demp, cbg_raster, fun = 'min')

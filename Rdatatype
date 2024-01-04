@@ -1,0 +1,107 @@
+#R data types
+
+# Scalars
+# Defining single value variables
+x <- 1
+y <- 3
+z <- x+y
+
+# Calculating square root of z
+sqrt(z)
+
+# Vectors
+# Numeric vector
+x <- c(1,2,5.3,6,-2,4)
+# Getting the length of the vector
+length(x)
+# Accessing the second element of the vector
+x[2]
+
+# Character vector
+y <- c('VT','CNRE','Geography')
+# Accessing the third element of the vector
+y[3]
+
+# Sequences of Dates
+# Creating a sequence of dates from Jan 1, 2021 to Dec 1, 2021
+seq(as.Date("2021/1/1"), as.Date("2021/12/1"), "days")
+
+# Matrices 
+# Creating a matrix
+m <- matrix(c(1,2,3,3,2,1), nrow=3, ncol=2)
+# Displaying the matrix
+m
+# Getting dimensions of the matrix
+dim(m)
+# Accessing the first column of the matrix
+m[,1]
+# Accessing the first row of the matrix
+m[1,]
+
+# Data frame
+# Creating a data frame
+n <- c(2,3,5)
+s <- c('aa','bb','cc')
+b <- c(TRUE,FALSE,TRUE)
+df <- data.frame(n,s,b)
+# Accessing a column in the data frame
+df$n
+# Selecting rows based on a condition
+df[df$b==TRUE,]
+
+# R Plots
+# Basic plotting
+x1 <- rnorm(100)
+y1 <- rnorm(100)
+plot(x1, y1)
+
+# Various plot customizations
+plot(x1, pch=1)
+plot(x1, pch=2, col='blue')
+plot(x1, pch=1, col='blue', cex=0.5)
+plot(x1, pch='1', col='red', cex=1.3)
+
+# More R plots
+# Creating a sine wave plot
+x2 <- seq(0,6,len=100)
+y2 <- sin(x2)
+plot(x2, y2, type='l', lwd=3, col='blue')
+# Adding noise to the sine wave
+y2r <- y2 + rnorm(100, 0, 0.1)
+points(x2, y2r)
+
+# Demo with raster and rgdal libraries
+# Note: These libraries are used for spatial data analysis
+library(raster)
+library(rgdal)
+
+a <- raster('dem.tif')
+plot(a)
+
+slope <- terrain(a, opt='slope', unit='degrees')
+plot(slope)
+
+# Using mapview library for interactive mapping
+# Note: mapview should be installed first
+# install.packages('mapview')
+library(mapview)
+mapview(a)
+
+# Downloading daily stream flow data from a USGS site
+# Note: dataRetrieval library is needed
+# install.packages('dataRetrieval')
+library(dataRetrieval)
+dflow <- readNWISdv(siteNumbers='03568933',
+                    startDate = "2021-01-01",
+                    endDate = "2021-12-31",
+                    parameterCd=c("00060"))
+# Displaying data characteristics
+dim(dflow)
+colnames(dflow)
+summary(dflow)
+# Plotting the stream flow data
+plot(dflow$Date, dflow$X_00060_00003, type='l', xlab='Date', ylab='streamflow (cfs)')
+
+# Reading a CSV file
+# Note: Ensure 'pop2010.csv' is in the working directory
+pop2010 <- read.csv('pop2010.csv')

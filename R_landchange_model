@@ -1,0 +1,62 @@
+#This script integrates various spatial data processing techniques, 
+#including raster data manipulation, logistic regression modeling, 
+#and prediction of land cover changes. It utilizes elevation and road network
+# data to enrich the analysis, and employs logistic regression to predict the 
+# probability of land cover change, 
+#finally visualizing and saving the results as a raster file.
+
+
+# Loading necessary libraries for raster data and spatial analysis
+library(raster)
+library(rgdal)
+library('FedData')
+
+# Reading land cover raster data for two different years
+lc1992 <- raster('loudoun1992.tif')
+lc2001 <- raster('loudoun2001.tif')
+
+# Initializing a raster for land cover change
+lchange <- lc1992
+lchange[lchange >= 0] <- NA  # Setting initial values to NA
+
+# Identifying specific land cover changes between the two years
+lchange[lc1992 == 1 & lc2001 == 2] <- 1  # Change from type 1 to type 2
+lchange[lc1992 == 1 & lc2001 == 1] <- 0  # No change
+
+# Downloading and processing elevation data
+elev <- get_ned(lchange, label = 'test')
+elev_p <- projectRaster(elev, res = 30, crs = crs(lchange))
+
+# Resampling the elevation data to match the land cover data resolution
+elev_rs <- resample(elev_p, lchange)
+
+# Deriving a slope layer from the elevation data
+slope <- terrain(elev_rs, opt = 'slope', unit = 'degrees')
+
+# Deriving a distance to road layer
+roads <- readOGR('.', layer = 'roads')
+roads_raster <- rasterize(roads, lchange)  # Rasterizing road data
+dist <- distance(roads_raster)  # Calculating distance to nearest road
+
+# Generating random samples for model training
+s_location <- sampleRandom(lchange, 10000, na.rm = T, asRaster = T)
+
+# Extracting values for the response and predictor variables
+y <- lchange[s_location >= 0]
+elev_value <- elev_rs[s_location >= 0]
+slope_value <- slope[s_location >= 0]
+dist_value <- dist[s_location >= 0]
+
+# Building a dataframe and then a logistic regression model
+df <- data.frame(y = y, elev = elev_value, slope = slope_value, dist = dist_value)
+glm <- glm(formula = y ~ elev + slope + dist, family = "binomial", data = df)
+
+# Developing a dataframe for all locations to predict probabilities
+df_all <- data.frame(y = getValues(lchange), elev = getValues(elev_rs), slope = getValues(slope), dist = getValues(dist))
+pred <- predict(glm, df_all, type = "response")
+
+# Generating a raster output of predicted probabilities
+output <- setValues(lchange, pred)
+output <- mask(output, lchange)  # Masking to keep the extent of original data
+plot(output)
+writeRaster(output, 'output.tif', overwrite = T)  # Saving the output raster

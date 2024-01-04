@@ -1,0 +1,83 @@
+#This script covers a range of functionalities for spatial data analysis in R. 
+#It includes downloading census data, road data, and hydrological features, 
+#visualizing them using mapview and tmap, and processing raster data. 
+#The script also demonstrates how to securely use an API 
+#key with the tidycensus package and how to iterate over files in a directory.
+
+
+# Loading necessary libraries for handling census data and mapping
+library(tidycensus)
+library(mapview)
+library(tmap)
+library(sf)
+library(raster)
+
+# Adding your CENSUS API key for secure access
+# Note: Replace with your own key and avoid sharing it in your code
+census_api_key("your_api_key_here", overwrite = TRUE, install = TRUE)
+readRenviron("~/.Renviron")
+
+# Using tidycensus to download 2010 census data at the county level for Virginia
+pop2010 <- get_decennial(geography = "county", variables = 'P001001', year = 2010, state = "VA", geometry = TRUE)
+
+# Displaying the map with mapview
+mapview(pop2010)
+
+# Filtering to a specific GEOID
+my_geoid <- '51107'
+loudoun <- pop2010[pop2010$GEOID == my_geoid,]
+mapview(loudoun)
+
+# Downloading population data at the census block group level
+pop2010 <- get_decennial(geography = "block group", variables = 'P001001', year = 2010,
+                         state = "VA", county = "Loudoun", geometry = TRUE)
+mapview(pop2010)
+
+# Downloading a different population variable (e.g., White alone)
+pop2010 <- get_decennial(geography = "block group", variables = 'P005003', year = 2010,
+                         state = "VA", county = "Loudoun", geometry = TRUE)
+
+# Switch to tmap library for mapping
+# Note: This part is commented out and can be filled with tmap functions as needed
+
+# Using tigris to download road data
+library(tigris)
+roads <- primary_secondary_roads('VA')
+
+# Quick mapping with tmap's qtm function
+qtm(roads)
+
+# Selecting roads by location or intersection with a specific area
+roads_loudoun <- st_intersection(roads, loudoun)
+qtm(roads_loudoun)
+
+# Downloading hydrological features for Loudoun county
+water <- linear_water("VA", "Loudoun")
+mapview(water)
+
+# Exporting downloaded data as shapefile
+# Note: Specific export commands can be added here
+
+# Using FedData to download DEM data for Loudoun county
+library(FedData)
+dem <- get_ned(loudoun, label = my_geoid)
+
+# Mapping DEM with tmap, adding county borders
+tm_shape(dem) +
+  tm_raster() +
+  tm_shape(loudoun) +
+  tm_borders()
+
+# Clipping or masking DEM with the county shape
+dem <- mask(dem, loudoun)
+tm_shape(dem) +
+  tm_raster()
+
+# Downloading NLCD data using FedData library
+# Note: Specific NLCD download commands can be added here
+
+# For loop to print the names of all shapefiles in the current directory
+filelist <- list.files('.', pattern = "*.shp$")
+for (i in 1:length(filelist)) {
+  print(filelist[i])
+}
